@@ -1,0 +1,63 @@
+export type DnsRecord = { type: string; value: string; ttl?: number | undefined };
+
+export type HostFinding = {
+  ip: string;
+  ports: number[];
+  vulns: string[];
+  cpes: string[];
+  hostnames: string[];
+  tags: string[];
+};
+
+export type SubdomainFinding = {
+  name: string;
+  ips: string[];
+  resolved: boolean;
+  firstSeen?: string | undefined;
+  issuer?: string | undefined;
+  via: "ct" | "dns";
+};
+
+export type HeaderCheck = {
+  name: string;
+  present: boolean;
+  value?: string | undefined;
+  severity: "critical" | "high" | "medium" | "low";
+  detail: string;
+};
+
+export type RiskItem = {
+  id: string;
+  title: string;
+  severity: "critical" | "high" | "medium" | "low" | "info";
+  category: "Network" | "TLS" | "Headers" | "Exposure" | "DNS" | "Email";
+  evidence: string;
+  remediation: string;
+};
+
+export type PageFinding = {
+  url: string;
+  status: number | null;
+  title?: string | undefined;
+  server?: string | undefined;
+  contentType?: string | undefined;
+  redirectedTo?: string | undefined;
+};
+
+export type ScanResult = {
+  domain: string;
+  scannedAt: string;
+  durationMs: number;
+  score: number;
+  grade: string;
+  dns: DnsRecord[];
+  subdomains: SubdomainFinding[];
+  subdomainTotal: number;
+  sources: string[];
+  hosts: HostFinding[];
+  headers: HeaderCheck[];
+  pages: PageFinding[];
+  risks: RiskItem[];
+  tech: string[];
+  notes: string[];
+};

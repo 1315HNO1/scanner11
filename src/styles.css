@@ -62,39 +62,53 @@
 }
 
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.129 0.042 264.695);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.129 0.042 264.695);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.129 0.042 264.695);
-  --primary: oklch(0.208 0.042 265.755);
-  --primary-foreground: oklch(0.984 0.003 247.858);
-  --secondary: oklch(0.968 0.007 247.896);
-  --secondary-foreground: oklch(0.208 0.042 265.755);
-  --muted: oklch(0.968 0.007 247.896);
-  --muted-foreground: oklch(0.554 0.046 257.417);
-  --accent: oklch(0.968 0.007 247.896);
-  --accent-foreground: oklch(0.208 0.042 265.755);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.984 0.003 247.858);
-  --border: oklch(0.929 0.013 255.508);
-  --input: oklch(0.929 0.013 255.508);
-  --ring: oklch(0.704 0.04 256.788);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.984 0.003 247.858);
-  --sidebar-foreground: oklch(0.129 0.042 264.695);
-  --sidebar-primary: oklch(0.208 0.042 265.755);
-  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-accent: oklch(0.968 0.007 247.896);
-  --sidebar-accent-foreground: oklch(0.208 0.042 265.755);
-  --sidebar-border: oklch(0.929 0.013 255.508);
-  --sidebar-ring: oklch(0.704 0.04 256.788);
+  --radius: 0.375rem;
+  --background: oklch(0.16 0.017 240);
+  --foreground: oklch(0.93 0.012 210);
+  --card: oklch(0.203 0.019 240);
+  --card-foreground: oklch(0.93 0.012 210);
+  --popover: oklch(0.203 0.019 240);
+  --popover-foreground: oklch(0.93 0.012 210);
+  --primary: oklch(0.82 0.16 178);
+  --primary-foreground: oklch(0.17 0.03 200);
+  --secondary: oklch(0.26 0.021 240);
+  --secondary-foreground: oklch(0.93 0.012 210);
+  --muted: oklch(0.245 0.019 240);
+  --muted-foreground: oklch(0.66 0.018 225);
+  --accent: oklch(0.29 0.035 200);
+  --accent-foreground: oklch(0.88 0.09 180);
+  --destructive: oklch(0.62 0.222 22);
+  --destructive-foreground: oklch(0.97 0.01 20);
+  --border: oklch(0.29 0.022 238);
+  --input: oklch(0.27 0.022 238);
+  --ring: oklch(0.82 0.16 178);
+
+  --sev-critical: oklch(0.6 0.235 18);
+  --sev-high: oklch(0.71 0.19 45);
+  --sev-medium: oklch(0.82 0.16 88);
+  --sev-low: oklch(0.75 0.11 215);
+  --sev-info: oklch(0.66 0.018 225);
+  --safe: oklch(0.8 0.17 155);
+
+  --chart-1: oklch(0.82 0.16 178);
+  --chart-2: oklch(0.6 0.235 18);
+  --chart-3: oklch(0.71 0.19 45);
+  --chart-4: oklch(0.82 0.16 88);
+  --chart-5: oklch(0.75 0.11 215);
+  --sidebar: oklch(0.18 0.018 240);
+  --sidebar-foreground: oklch(0.93 0.012 210);
+  --sidebar-primary: oklch(0.82 0.16 178);
+  --sidebar-primary-foreground: oklch(0.17 0.03 200);
+  --sidebar-accent: oklch(0.26 0.021 240);
+  --sidebar-accent-foreground: oklch(0.93 0.012 210);
+  --sidebar-border: oklch(0.29 0.022 238);
+  --sidebar-ring: oklch(0.82 0.16 178);
+
+  --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-mono-stack: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --grid-line: oklch(0.82 0.16 178 / 0.05);
+  --glow-primary: 0 0 0 1px oklch(0.82 0.16 178 / 0.25), 0 0 28px -6px oklch(0.82 0.16 178 / 0.45);
 }
 
 .dark {
@@ -140,5 +154,57 @@
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
+    font-family: var(--font-mono-stack);
+    background-image:
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+    background-size: 48px 48px;
   }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
+}
+
+@theme inline {
+  --color-sev-critical: var(--sev-critical);
+  --color-sev-high: var(--sev-high);
+  --color-sev-medium: var(--sev-medium);
+  --color-sev-low: var(--sev-low);
+  --color-sev-info: var(--sev-info);
+  --color-safe: var(--safe);
+  --font-display: var(--font-display);
+  --font-mono: var(--font-mono-stack);
+}
+
+@utility panel {
+  background-color: color-mix(in oklab, var(--card) 82%, transparent);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  backdrop-filter: blur(6px);
+}
+
+@utility glow {
+  box-shadow: var(--glow-primary);
+}
+
+@keyframes sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
+}
+
+@utility scanline {
+  position: relative;
+  overflow: hidden;
+}
+
+@utility scan-sweep {
+  animation: sweep 1.6s linear infinite;
 }
