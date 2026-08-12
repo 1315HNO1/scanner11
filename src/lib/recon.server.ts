@@ -483,7 +483,7 @@ export function buildRisks(input: {
       severity: s.resolved ? "medium" : "low",
       category: "Exposure",
       evidence: s.resolved
-        ? `${s.name} resolves to ${s.ips.join(", ")} and appears in public certificate transparency logs.`
+        ? `${s.name} resolves to ${s.ips.join(", ")} (discovered via ${s.via === "dns" ? "DNS enumeration" : "certificate transparency logs"}).`
         : `${s.name} appears in certificate transparency logs but does not currently resolve.`,
       remediation: s.resolved
         ? "Confirm this non-production or admin host requires authentication and IP allow-listing."
