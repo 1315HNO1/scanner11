@@ -73,12 +73,19 @@ function addName(
   map: Map<string, SubdomainFinding>,
   raw: string,
   domain: string,
-  meta: { firstSeen?: string | undefined; issuer?: string | undefined },
+  meta: { firstSeen?: string | undefined; issuer?: string | undefined; via?: "ct" | "dns" },
 ) {
   const n = raw.trim().toLowerCase().replace(/^\*\./, "");
   if (!n || n.includes(" ") || !(n === domain || n.endsWith(`.${domain}`))) return;
   if (map.has(n)) return;
-  map.set(n, { name: n, ips: [], resolved: false, firstSeen: meta.firstSeen, issuer: meta.issuer });
+  map.set(n, {
+    name: n,
+    ips: [],
+    resolved: false,
+    firstSeen: meta.firstSeen,
+    issuer: meta.issuer,
+    via: meta.via ?? "ct",
+  });
 }
 
 async function fromCrtSh(domain: string, map: Map<string, SubdomainFinding>) {
@@ -157,7 +164,7 @@ export async function enumerateSubdomains(
   for (const name of sweep) {
     if (!name) continue;
     swept++;
-    addName(map, name, domain, { issuer: undefined, firstSeen: undefined });
+    addName(map, name, domain, { issuer: undefined, firstSeen: undefined, via: "dns" });
   }
   if (swept) sources.push("DNS sweep");
 
