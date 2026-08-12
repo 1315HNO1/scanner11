@@ -246,6 +246,7 @@ export function ScanReport({ result }: { result: ScanResult }) {
                   <tr>
                     <th className="py-2 pr-3 font-medium">Host</th>
                     <th className="py-2 pr-3 font-medium">Resolves to</th>
+                    <th className="py-2 pr-3 font-medium">Source</th>
                     <th className="py-2 font-medium">Issuer</th>
                   </tr>
                 </thead>
@@ -256,6 +257,7 @@ export function ScanReport({ result }: { result: ScanResult }) {
                         <span className={s.resolved ? "text-foreground" : "text-muted-foreground"}>{s.name}</span>
                       </td>
                       <td className="py-2 pr-3 font-mono text-primary/80">{s.ips.join(", ") || "—"}</td>
+                      <td className="py-2 pr-3 text-muted-foreground">{s.via === "dns" ? "DNS" : "CT log"}</td>
                       <td className="py-2 text-muted-foreground">{s.issuer ?? "—"}</td>
                     </tr>
                   ))}
