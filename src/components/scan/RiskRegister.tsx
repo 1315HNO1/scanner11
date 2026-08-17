@@ -6,6 +6,22 @@ import { Empty, Panel, SevBadge } from "./primitives";
 const ORDER = ["critical", "high", "medium", "low", "info"] as const;
 type Sev = (typeof ORDER)[number];
 
+const BAR: Record<Sev, string> = {
+  critical: "bg-sev-critical",
+  high: "bg-sev-high",
+  medium: "bg-sev-medium",
+  low: "bg-sev-low",
+  info: "bg-sev-info",
+};
+
+const CHIP: Record<Sev, string> = {
+  critical: "text-sev-critical border-sev-critical/50 bg-sev-critical/10",
+  high: "text-sev-high border-sev-high/50 bg-sev-high/10",
+  medium: "text-sev-medium border-sev-medium/50 bg-sev-medium/10",
+  low: "text-sev-low border-sev-low/50 bg-sev-low/10",
+  info: "text-sev-info border-sev-info/50 bg-sev-info/10",
+};
+
 type Group = {
   key: string;
   title: string;
@@ -143,7 +159,7 @@ export function RiskRegister({ risks }: { risks: RiskItem[] }) {
                   key={s}
                   title={`${counts[s]} ${s}`}
                   style={{ width: `${((counts[s] ?? 0) / total) * 100}%` }}
-                  className={`h-full bg-sev-${s}`}
+                  className={`h-full ${BAR[s]}`}
                 />
               ) : null,
             )}
@@ -165,7 +181,7 @@ export function RiskRegister({ risks }: { risks: RiskItem[] }) {
                 key={s}
                 onClick={() => setFilter(s)}
                 className={`rounded border px-2.5 py-1 text-[11px] font-medium uppercase tracking-widest transition-colors ${
-                  filter === s ? `text-sev-${s} border-sev-${s}/50 bg-sev-${s}/10` : "border-border text-muted-foreground hover:text-foreground"
+                  filter === s ? CHIP[s] : "border-border text-muted-foreground hover:text-foreground"
                 }`}
               >
                 {s} {counts[s]}
