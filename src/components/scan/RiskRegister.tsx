@@ -87,11 +87,9 @@ function GroupCard({ group }: { group: Group }) {
           <span className="mt-1 block text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
             {group.category}
           </span>
-          {!open && !single ? (
+          {!open && !single && first.title.includes(":") ? (
             <span className="mt-2 block truncate font-mono text-[11px] text-muted-foreground">
-              {group.items
-                .map((i) => (i.title.includes(":") ? i.title.split(":").slice(1).join(":").trim() : i.title))
-                .join(", ")}
+              {group.items.map((i) => i.title.split(":").slice(1).join(":").trim()).join(", ")}
             </span>
           ) : null}
         </span>
@@ -103,9 +101,9 @@ function GroupCard({ group }: { group: Group }) {
           <ul className="space-y-2">
             {group.items.map((r) => (
               <li key={r.id} className="rounded border border-border/50 bg-card/40 p-3">
-                {!single ? (
+                {!single && r.title.includes(":") ? (
                   <p className="mb-1 font-mono text-xs font-semibold text-primary">
-                    {r.title.includes(":") ? r.title.split(":").slice(1).join(":").trim() : r.title}
+                    {r.title.split(":").slice(1).join(":").trim()}
                   </p>
                 ) : null}
                 <pre className="whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-muted-foreground">
