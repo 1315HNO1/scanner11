@@ -6,11 +6,12 @@ import {
   ScrollText,
   ServerCog,
   ShieldCheck,
-  Sparkles,
   FileText,
+  Download,
 } from "lucide-react";
 import type { ScanResult } from "@/lib/recon.types";
 import { Empty, Panel, SevBadge, Stat } from "./primitives";
+import { RiskRegister } from "./RiskRegister";
 
 const TABS = [
   { id: "risks", label: "Risk register", icon: AlertTriangle },
@@ -124,6 +125,34 @@ export function ScanReport({ result }: { result: ScanResult }) {
         </div>
       ) : null}
 
+      <div className="panel flex flex-wrap items-center justify-between gap-3 p-4">
+        <p className="max-w-3xl text-xs leading-relaxed text-muted-foreground">
+          <span className="font-semibold text-foreground">Summary — </span>
+          {result.subdomainTotal} subdomain(s) and {result.hosts.length} live IP(s) expose {openPorts.size} distinct
+          open port(s){cves.length ? ` and ${cves.length} known CVE(s)` : ""}. {result.risks.length} finding(s) were
+          scored:{" "}
+          {(["critical", "high", "medium", "low", "info"] as const)
+            .filter((s) => counts[s])
+            .map((s) => `${counts[s]} ${s}`)
+            .join(", ") || "none"}
+          . Grade <span className={gradeTone(result.grade)}>{result.grade}</span> ({result.score}/100).
+        </p>
+        <button
+          onClick={() => {
+            const blob = new Blob([JSON.stringify(result, null, 2)], { type: "application/json" });
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = `surfacescan-${result.domain}.json`;
+            a.click();
+            URL.revokeObjectURL(a.href);
+          }}
+          className="inline-flex shrink-0 items-center gap-2 rounded border border-border px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:text-primary"
+        >
+          <Download className="size-3.5" />
+          Export JSON
+        </button>
+      </div>
+
       <nav className="flex flex-wrap gap-2">
         {TABS.map((t) => {
           const Icon = t.icon;
@@ -145,30 +174,7 @@ export function ScanReport({ result }: { result: ScanResult }) {
         })}
       </nav>
 
-      {tab === "risks" ? (
-        <Panel title="Risk register" hint={`${result.risks.length} findings, ranked by severity`}>
-          {result.risks.length === 0 ? (
-            <Empty>No issues detected from passive analysis.</Empty>
-          ) : (
-            <ul className="space-y-3">
-              {result.risks.map((r) => (
-                <li key={r.id} className="rounded border border-border bg-background/40 p-4">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <SevBadge severity={r.severity} />
-                    <span className="text-[10px] uppercase tracking-widest text-muted-foreground">{r.category}</span>
-                    <h4 className="w-full font-display text-sm font-semibold text-foreground sm:w-auto">{r.title}</h4>
-                  </div>
-                  <pre className="mt-2 whitespace-pre-wrap break-words text-xs text-muted-foreground">{r.evidence}</pre>
-                  <p className="mt-2 flex gap-2 text-xs text-primary/90">
-                    <Sparkles className="mt-0.5 size-3.5 shrink-0" />
-                    {r.remediation}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Panel>
-      ) : null}
+      {tab === "risks" ? <RiskRegister risks={result.risks} /> : null}
 
       {tab === "hosts" ? (
         <Panel title="Network surface" hint="IP addresses, open ports and known CVEs">
