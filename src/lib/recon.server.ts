@@ -306,6 +306,7 @@ export async function inspectOrigin(domain: string): Promise<{
     server: server ?? undefined,
     contentType: h.get("content-type") ?? undefined,
     redirectedTo: res.url && res.url !== `https://${domain}/` ? res.url : undefined,
+    source: "home",
   };
 
   return { checks, home, html, tech: [...tech], httpsOk: res.status < 500 };
@@ -333,13 +334,13 @@ export function extractLinks(html: string, domain: string, cap: number): string[
   return [...urls].slice(0, cap);
 }
 
-export async function probePages(urls: string[]): Promise<PageFinding[]> {
+export async function probePages(urls: string[], source: PageFinding["source"] = "linked"): Promise<PageFinding[]> {
   return pool(urls, 8, async (url) => {
     const res = await withTimeout(
       (signal) => fetch(url, { signal, headers: { "user-agent": UA }, redirect: "follow" }),
       10000,
     );
-    if (!res) return { url, status: null };
+    if (!res) return { url, status: null, source };
     const ct = res.headers.get("content-type") ?? "";
     let title: string | undefined;
     if (ct.includes("text/html")) {
@@ -353,8 +354,101 @@ export async function probePages(urls: string[]): Promise<PageFinding[]> {
       server: res.headers.get("server") ?? undefined,
       contentType: ct || undefined,
       redirectedTo: res.url !== url ? res.url : undefined,
+      source,
     } satisfies PageFinding;
   });
+}
+
+const HIDDEN_PATHS = [
+  "/robots.txt",
+  "/sitemap.xml",
+  "/.env",
+  "/.git/config",
+  "/.git/HEAD",
+  "/.htaccess",
+  "/wp-admin/",
+  "/wp-login.php",
+  "/admin",
+  "/administrator",
+  "/login",
+  "/dashboard",
+  "/backup",
+  "/backups",
+  "/config",
+  "/phpinfo.php",
+  "/server-status",
+  "/server-info",
+  "/actuator",
+  "/actuator/env",
+  "/api",
+  "/api-docs",
+  "/swagger.json",
+  "/debug",
+  "/test",
+  "/.well-known/security.txt",
+];
+
+const SENSITIVE_EXPOSED = new Set([
+  "/.env",
+  "/.git/config",
+  "/.git/HEAD",
+  "/.htaccess",
+  "/phpinfo.php",
+  "/server-status",
+  "/server-info",
+  "/actuator",
+  "/actuator/env",
+  "/swagger.json",
+  "/backup",
+  "/backups",
+]);
+
+export async function discoverHiddenPaths(domain: string): Promise<{ urls: { url: string; source: PageFinding["source"] }[] }> {
+  const found = new Map<string, PageFinding["source"]>();
+
+  // robots.txt — disallowed paths are pages the owner wants hidden
+  const robots = await withTimeout(
+    (signal) => fetch(`https://${domain}/robots.txt`, { signal, headers: { "user-agent": UA } }),
+    8000,
+  );
+  if (robots && robots.ok) {
+    const text = await robots.text().catch(() => "");
+    for (const line of text.split("\n")) {
+      const m = line.match(/^\s*(?:disallow|allow)\s*:\s*(\/\S*)/i);
+      if (!m) continue;
+      const path = m[1]!.replace(/[*$].*$/, "");
+      if (path && path !== "/") found.set(`https://${domain}${path}`, "robots");
+    }
+  }
+
+  // sitemap.xml — often lists pages not linked from the homepage
+  const sitemap = await withTimeout(
+    (signal) => fetch(`https://${domain}/sitemap.xml`, { signal, headers: { "user-agent": UA } }),
+    8000,
+  );
+  if (sitemap && sitemap.ok) {
+    const text = await sitemap.text().catch(() => "");
+    const re = /<loc>\s*([^<]+?)\s*<\/loc>/gi;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(text)) !== null && found.size < 80) {
+      try {
+        const u = new URL(m[1]!.trim());
+        if (u.hostname.endsWith(domain) && !/\.xml$/i.test(u.pathname)) {
+          if (!found.has(u.href)) found.set(u.href, "sitemap");
+        }
+      } catch {
+        /* ignore malformed loc */
+      }
+    }
+  }
+
+  // well-known sensitive paths probe
+  for (const p of HIDDEN_PATHS) {
+    const url = `https://${domain}${p}`;
+    if (!found.has(url)) found.set(url, "hidden");
+  }
+
+  return { urls: [...found].slice(0, 100).map(([url, source]) => ({ url, source })) };
 }
 
 const RISKY_PORTS: Record<number, { label: string; severity: RiskItem["severity"]; why: string }> = {
@@ -491,6 +585,36 @@ export function buildRisks(input: {
     });
   }
 
+  const exposed = input.pages.filter(
+    (p) => p.status === 200 && SENSITIVE_EXPOSED.has(new URL(p.url).pathname),
+  );
+  for (const p of exposed.slice(0, 10)) {
+    risks.push({
+      id: `exposed-${new URL(p.url).pathname}`,
+      title: `Sensitive path publicly reachable: ${new URL(p.url).pathname}`,
+      severity: "high",
+      category: "Exposure",
+      evidence: `GET ${p.url} returned HTTP 200${p.contentType ? ` (${p.contentType})` : ""}.`,
+      remediation:
+        "Block this path at the web server or CDN and rotate any credentials it may have exposed. Never deploy .env, .git, or status/debug endpoints to production.",
+    });
+  }
+
+  const robotsHidden = input.pages.filter((p) => p.source === "robots" && p.status === 200);
+  if (robotsHidden.length) {
+    risks.push({
+      id: "robots-disallow-reachable",
+      title: `${robotsHidden.length} robots.txt-disallowed path(s) are publicly reachable`,
+      severity: "low",
+      category: "Exposure",
+      evidence: robotsHidden
+        .slice(0, 5)
+        .map((p) => new URL(p.url).pathname)
+        .join(", "),
+      remediation: "robots.txt is not access control — protect private areas with authentication instead.",
+    });
+  }
+
   const broken = input.pages.filter((p) => p.status !== null && p.status >= 500);
   if (broken.length) {
     risks.push({
@@ -565,9 +689,17 @@ export async function runScan(rawDomain: string): Promise<ScanResult> {
   const ips = [...ipSet].slice(0, 30);
 
   const linkUrls = extractLinks(origin.html, domain, 24);
-  const [hosts, pages] = await Promise.all([scanHosts(ips), probePages(linkUrls)]);
+  const hidden = await discoverHiddenPaths(domain);
+  const hiddenUrls = hidden.urls.filter((h) => !linkUrls.includes(h.url));
+  const [hosts, pages, hiddenPages] = await Promise.all([
+    scanHosts(ips),
+    probePages(linkUrls, "linked"),
+    probePages(hiddenUrls.map((h) => h.url), undefined).then((results) =>
+      results.map((p, i) => ({ ...p, source: hiddenUrls[i]!.source })),
+    ),
+  ]);
 
-  const allPages = origin.home ? [origin.home, ...pages] : pages;
+  const allPages = [...(origin.home ? [origin.home] : []), ...pages, ...hiddenPages];
   const risks = buildRisks({ domain, dns, hosts, headers: origin.checks, subdomains, pages: allPages });
   const { score, grade } = scoreRisks(risks);
 
