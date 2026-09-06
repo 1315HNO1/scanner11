@@ -42,6 +42,7 @@ export type PageFinding = {
   server?: string | undefined;
   contentType?: string | undefined;
   redirectedTo?: string | undefined;
+  source?: "home" | "linked" | "robots" | "sitemap" | "hidden" | undefined;
 };
 
 export type ScanResult = {

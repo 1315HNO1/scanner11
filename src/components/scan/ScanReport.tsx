@@ -277,7 +277,7 @@ export function ScanReport({ result }: { result: ScanResult }) {
       ) : null}
 
       {tab === "pages" ? (
-        <Panel title="Crawled pages" hint="Same-origin links discovered from the homepage">
+        <Panel title="Crawled pages" hint="Linked pages plus hidden paths from robots.txt, sitemap.xml, and a sensitive-path probe">
           {result.pages.length === 0 ? (
             <Empty>No pages could be reached.</Empty>
           ) : (
@@ -297,6 +297,19 @@ export function ScanReport({ result }: { result: ScanResult }) {
                   >
                     {p.status ?? "ERR"}
                   </span>
+                  {p.source && p.source !== "home" ? (
+                    <span
+                      className={`shrink-0 rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide ${
+                        p.source === "hidden"
+                          ? "border-sev-medium/40 text-sev-medium"
+                          : p.source === "robots"
+                            ? "border-sev-low/40 text-sev-low"
+                            : "border-border/60 text-muted-foreground"
+                      }`}
+                    >
+                      {p.source}
+                    </span>
+                  ) : null}
                   <a href={p.url} target="_blank" rel="noreferrer" className="truncate text-foreground hover:text-primary">
                     {p.url}
                   </a>
