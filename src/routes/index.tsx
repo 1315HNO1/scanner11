@@ -98,6 +98,7 @@ function Index() {
         {SAMPLES.map((s) => (
           <button
             key={s}
+            type="button"
             onClick={() => run(s)}
             className="rounded border border-border px-2 py-0.5 transition-colors hover:border-primary/50 hover:text-primary"
           >
@@ -113,8 +114,12 @@ function Index() {
               <div className="scan-sweep h-px w-1/4 bg-primary" />
             </div>
             <ul className="space-y-2 text-xs text-muted-foreground">
-              {STAGES.map((s) => (
-                <li key={s} className="flex items-center gap-2">
+              {STAGES.map((s, i) => (
+                <li
+                  key={s}
+                  className="flex items-center gap-2 animate-pulse"
+                  style={{ animationDelay: `${i * 220}ms` }}
+                >
                   <Loader2 className="size-3 animate-spin text-primary" />
                   {s}
                 </li>
@@ -131,6 +136,15 @@ function Index() {
 
         {mutation.data && !mutation.isPending ? <ScanReport result={mutation.data} /> : null}
       </div>
+
+      <footer className="mt-16 border-t border-border pt-6 text-center text-[11px] text-muted-foreground">
+        <p>
+          SurfaceScan · passive intelligence only. Scan domains you own or are authorised to test.
+        </p>
+        <p className="mt-1.5">
+          Made by <span className="font-mono font-semibold text-primary">1315HN01</span>
+        </p>
+      </footer>
     </main>
   );
 }
