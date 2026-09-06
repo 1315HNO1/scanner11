@@ -165,6 +165,7 @@ export function RiskRegister({ risks }: { risks: RiskItem[] }) {
 
           <div className="mb-4 flex flex-wrap gap-2">
             <button
+              type="button"
               onClick={() => setFilter("all")}
               className={`rounded border px-2.5 py-1 text-[11px] font-medium transition-colors ${
                 filter === "all"
@@ -177,6 +178,7 @@ export function RiskRegister({ risks }: { risks: RiskItem[] }) {
             {ORDER.filter((s) => counts[s]).map((s) => (
               <button
                 key={s}
+                type="button"
                 onClick={() => setFilter(s)}
                 className={`rounded border px-2.5 py-1 text-[11px] font-medium uppercase tracking-widest transition-colors ${
                   filter === s ? CHIP[s] : "border-border text-muted-foreground hover:text-foreground"

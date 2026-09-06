@@ -71,7 +71,7 @@ export function ScanReport({ result }: { result: ScanResult }) {
   return (
     <div className="space-y-6">
       <div className="panel glow flex flex-col gap-6 p-6 md:flex-row md:items-center">
-        <div className="flex items-center gap-5">
+        <div className="flex flex-wrap items-center gap-5">
           <div className="relative grid size-24 shrink-0 place-items-center">
             <svg viewBox="0 0 100 100" className="absolute inset-0 -rotate-90">
               <circle cx="50" cy="50" r="44" fill="none" stroke="currentColor" strokeWidth="6" className="text-border" />
@@ -93,7 +93,7 @@ export function ScanReport({ result }: { result: ScanResult }) {
             </div>
           </div>
           <div>
-            <h2 className="font-display text-2xl font-semibold text-foreground">{result.domain}</h2>
+            <h2 className="font-display text-xl font-semibold break-all text-foreground sm:text-2xl">{result.domain}</h2>
             <p className="mt-1 text-xs text-muted-foreground">
               Scanned {new Date(result.scannedAt).toLocaleString()} · {(result.durationMs / 1000).toFixed(1)}s
             </p>
@@ -138,6 +138,7 @@ export function ScanReport({ result }: { result: ScanResult }) {
           . Grade <span className={gradeTone(result.grade)}>{result.grade}</span> ({result.score}/100).
         </p>
         <button
+          type="button"
           onClick={() => {
             const blob = new Blob([JSON.stringify(result, null, 2)], { type: "application/json" });
             const a = document.createElement("a");
@@ -153,15 +154,16 @@ export function ScanReport({ result }: { result: ScanResult }) {
         </button>
       </div>
 
-      <nav className="flex flex-wrap gap-2">
+      <nav className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
         {TABS.map((t) => {
           const Icon = t.icon;
           const active = tab === t.id;
           return (
             <button
               key={t.id}
+              type="button"
               onClick={() => setTab(t.id)}
-              className={`inline-flex items-center gap-2 rounded border px-3 py-2 text-xs font-medium transition-colors ${
+              className={`inline-flex shrink-0 items-center gap-2 rounded border px-3 py-2 text-xs font-medium transition-colors ${
                 active
                   ? "border-primary/50 bg-primary/10 text-primary"
                   : "border-border bg-card/50 text-muted-foreground hover:text-foreground"
