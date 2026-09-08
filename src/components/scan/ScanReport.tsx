@@ -323,6 +323,104 @@ export function ScanReport({ result }: { result: ScanResult }) {
         </Panel>
       ) : null}
 
+      {tab === "whois" ? (
+        <Panel title="Domain registration (WHOIS / RDAP)" hint={result.whois?.source ?? "Official registry records"}>
+          {!result.whois?.available ? (
+            <Empty>Registration data was not available for this domain.</Empty>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex flex-wrap gap-2">
+                {result.whois.expired ? (
+                  <SevBadge severity="critical">expired</SevBadge>
+                ) : (
+                  <SevBadge severity="safe">active</SevBadge>
+                )}
+                {result.whois.parked ? <SevBadge severity="medium">parked</SevBadge> : null}
+                {result.whois.privacyProtected ? <SevBadge severity="low">privacy protected</SevBadge> : null}
+                {result.whois.dnssec ? <SevBadge severity="safe">DNSSEC</SevBadge> : <SevBadge severity="low">no DNSSEC</SevBadge>}
+                {result.whois.daysToExpiry !== undefined && result.whois.daysToExpiry >= 0 ? (
+                  <SevBadge severity={result.whois.daysToExpiry <= 30 ? "medium" : "safe"}>
+                    {result.whois.daysToExpiry} days to renewal
+                  </SevBadge>
+                ) : null}
+              </div>
+
+              <dl className="grid grid-cols-1 gap-x-6 gap-y-2 text-xs sm:grid-cols-2">
+                {(
+                  [
+                    ["Registered", result.whois.createdAt ? new Date(result.whois.createdAt).toLocaleDateString() : "—"],
+                    ["Last updated", result.whois.updatedAt ? new Date(result.whois.updatedAt).toLocaleDateString() : "—"],
+                    ["Expires", result.whois.expiresAt ? new Date(result.whois.expiresAt).toLocaleDateString() : "—"],
+                    ["Domain age", result.whois.ageDays !== undefined ? `${(result.whois.ageDays / 365).toFixed(1)} years` : "—"],
+                    ["Registrar", result.whois.registrar ?? "—"],
+                    ["IANA ID", result.whois.registrarIanaId ?? "—"],
+                    ["Abuse contact", result.whois.abuseEmail ?? "—"],
+                    ["Abuse phone", result.whois.abusePhone ?? "—"],
+                  ] as [string, string][]
+                ).map(([k, v]) => (
+                  <div key={k} className="flex justify-between gap-3 border-b border-border/40 py-1.5">
+                    <dt className="text-muted-foreground">{k}</dt>
+                    <dd className="break-all text-right text-foreground">{v}</dd>
+                  </div>
+                ))}
+              </dl>
+
+              {result.whois.statuses.length ? (
+                <div>
+                  <p className="mb-1.5 text-[10px] uppercase tracking-widest text-muted-foreground">Registry status</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {result.whois.statuses.map((s) => (
+                      <span key={s} className="rounded border border-border bg-secondary px-2 py-0.5 text-[11px] text-foreground">
+                        {s}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {result.whois.nameservers.length ? (
+                <div>
+                  <p className="mb-1.5 text-[10px] uppercase tracking-widest text-muted-foreground">Nameservers</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {result.whois.nameservers.map((n) => (
+                      <span key={n} className="rounded border border-border px-2 py-0.5 font-mono text-[11px] text-primary/80">
+                        {n}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              <div>
+                <p className="mb-1.5 text-[10px] uppercase tracking-widest text-muted-foreground">Owner / contacts</p>
+                {result.whois.contacts.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    Registrant details are redacted by the registry (GDPR / WHOIS privacy).
+                  </p>
+                ) : (
+                  <ul className="space-y-1.5">
+                    {result.whois.contacts.map((c, i) => (
+                      <li key={`${c.role}-${i}`} className="rounded border border-border/60 px-3 py-2 text-xs">
+                        <span className="font-semibold uppercase text-primary">{c.role}</span>
+                        <span className="ml-2 break-all text-foreground">
+                          {[c.name, c.org, c.email, c.phone, c.country].filter(Boolean).join(" · ") || "redacted"}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              {result.whois.parkedReason ? (
+                <p className="rounded border border-sev-medium/40 bg-sev-medium/10 p-3 text-xs text-sev-medium">
+                  {result.whois.parkedReason}
+                </p>
+              ) : null}
+            </div>
+          )}
+        </Panel>
+      ) : null}
+
       {tab === "dns" ? (
         <Panel title="DNS records" hint="A / AAAA / MX / NS / TXT / CNAME / SOA / CAA">
           {result.dns.length === 0 ? (
