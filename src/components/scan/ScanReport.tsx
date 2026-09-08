@@ -8,6 +8,7 @@ import {
   ShieldCheck,
   FileText,
   Download,
+  BookUser,
 } from "lucide-react";
 import type { ScanResult } from "@/lib/recon.types";
 import { Empty, Panel, SevBadge, Stat } from "./primitives";
@@ -18,6 +19,7 @@ const TABS = [
   { id: "hosts", label: "Ports & IPs", icon: Network },
   { id: "subs", label: "Subdomains", icon: Globe },
   { id: "pages", label: "Pages", icon: FileText },
+  { id: "whois", label: "WHOIS", icon: BookUser },
   { id: "dns", label: "DNS", icon: ServerCog },
   { id: "headers", label: "Headers", icon: ShieldCheck },
 ] as const;
