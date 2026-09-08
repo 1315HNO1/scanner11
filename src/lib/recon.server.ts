@@ -655,6 +655,7 @@ export function buildRisks(input: {
   headers: HeaderCheck[];
   subdomains: SubdomainFinding[];
   pages: PageFinding[];
+  whois?: WhoisInfo | undefined;
 }): RiskItem[] {
   const risks: RiskItem[] = [];
 
@@ -745,6 +746,83 @@ export function buildRisks(input: {
         ? "Confirm this non-production or admin host requires authentication and IP allow-listing."
         : "Dangling CT entries can indicate stale infrastructure or subdomain-takeover risk — verify ownership.",
     });
+  }
+
+  const w = input.whois;
+  if (w?.available) {
+    if (w.expired) {
+      risks.push({
+        id: "whois-expired",
+        title: "Domain registration has expired",
+        severity: "critical",
+        category: "DNS",
+        evidence: `Registry expiry date ${w.expiresAt} has passed (${Math.abs(w.daysToExpiry ?? 0)} day(s) ago).`,
+        remediation: "Renew the domain immediately — expired domains can be dropped and re-registered by anyone.",
+      });
+    } else if (w.daysToExpiry !== undefined && w.daysToExpiry <= 30) {
+      risks.push({
+        id: "whois-expiring",
+        title: `Domain expires in ${w.daysToExpiry} day(s)`,
+        severity: w.daysToExpiry <= 7 ? "high" : "medium",
+        category: "DNS",
+        evidence: `Registry expiry date is ${w.expiresAt}.`,
+        remediation: "Renew now and enable auto-renew to avoid an accidental lapse and domain hijack.",
+      });
+    }
+    if (!w.statuses.some((s) => /transfer ?prohibited/i.test(s))) {
+      risks.push({
+        id: "whois-no-lock",
+        title: "Domain transfer lock is not set",
+        severity: "medium",
+        category: "DNS",
+        evidence: `Registry status: ${w.statuses.join(", ") || "none reported"}.`,
+        remediation: "Enable clientTransferProhibited (registrar lock) to block unauthorised domain transfers.",
+      });
+    }
+    if (w.dnssec === false) {
+      risks.push({
+        id: "whois-dnssec",
+        title: "DNSSEC is not enabled",
+        severity: "low",
+        category: "DNS",
+        evidence: `${w.domain} is not signed in the registry (delegationSigned = false).`,
+        remediation: "Enable DNSSEC at your registrar and DNS host to protect against DNS spoofing.",
+      });
+    }
+    if (w.parked) {
+      risks.push({
+        id: "whois-parked",
+        title: "Domain appears to be parked",
+        severity: "medium",
+        category: "Exposure",
+        evidence: w.parkedReason ?? "Parking page indicators found on the homepage.",
+        remediation: "Parked domains serve third-party ads and can damage brand trust. Point it at real content or redirect it.",
+      });
+    }
+    if (!w.privacyProtected && w.contacts.some((c) => c.email)) {
+      risks.push({
+        id: "whois-exposed-contacts",
+        title: "Registrant contact details are public",
+        severity: "low",
+        category: "Exposure",
+        evidence: `Public registration data exposes ${w.contacts
+          .filter((c) => c.email)
+          .map((c) => `${c.role}: ${c.email}`)
+          .slice(0, 3)
+          .join(", ")}.`,
+        remediation: "Enable registrar WHOIS privacy to reduce targeted phishing and spam against domain owners.",
+      });
+    }
+    if (w.ageDays !== undefined && w.ageDays < 90) {
+      risks.push({
+        id: "whois-new",
+        title: `Domain registered only ${w.ageDays} day(s) ago`,
+        severity: "info",
+        category: "DNS",
+        evidence: `Registration date ${w.createdAt}. Newly registered domains are commonly used in phishing campaigns.`,
+        remediation: "Nothing to fix if this is your own new domain — but expect lower reputation scores at email and web filters.",
+      });
+    }
   }
 
   const exposed = input.pages.filter(
