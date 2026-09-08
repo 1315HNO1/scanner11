@@ -6,7 +6,169 @@ import type {
   RiskItem,
   ScanResult,
   SubdomainFinding,
+  WhoisContact,
+  WhoisInfo,
 } from "./recon.types";
+
+const PARKING_SIGNS = [
+  "sedoparking",
+  "parkingcrew",
+  "bodis.com",
+  "above.com",
+  "dan.com",
+  "afternic",
+  "hugedomains",
+  "domain is for sale",
+  "buy this domain",
+  "parked free",
+  "godaddy.com/domainfind",
+  "namecheap.com/domains/parked",
+];
+
+function vcardValue(vcard: unknown, key: string): string | undefined {
+  if (!Array.isArray(vcard) || !Array.isArray(vcard[1])) return undefined;
+  for (const entry of vcard[1] as unknown[]) {
+    if (Array.isArray(entry) && entry[0] === key && typeof entry[3] === "string" && entry[3].trim()) {
+      return entry[3].trim();
+    }
+    if (Array.isArray(entry) && entry[0] === key && Array.isArray(entry[3])) {
+      const parts = (entry[3] as unknown[]).filter((p) => typeof p === "string" && p).join(", ");
+      if (parts) return parts;
+    }
+  }
+  return undefined;
+}
+
+function vcardCountry(vcard: unknown): string | undefined {
+  if (!Array.isArray(vcard) || !Array.isArray(vcard[1])) return undefined;
+  for (const entry of vcard[1] as unknown[]) {
+    if (Array.isArray(entry) && entry[0] === "adr") {
+      const adr = entry[3];
+      if (Array.isArray(adr)) {
+        const last = [...adr].reverse().find((p) => typeof p === "string" && p.trim());
+        if (typeof last === "string") return last.trim();
+      }
+      const label = (entry[1] as Record<string, unknown> | undefined)?.["label"];
+      if (typeof label === "string") return label.split("\n").pop()?.trim();
+    }
+  }
+  return undefined;
+}
+
+export async function lookupWhois(domain: string, homeHtml: string): Promise<WhoisInfo> {
+  const empty: WhoisInfo = {
+    available: false,
+    domain,
+    expired: false,
+    statuses: [],
+    nameservers: [],
+    contacts: [],
+    privacyProtected: false,
+    parked: false,
+  };
+
+  const res = await withTimeout(
+    (signal) =>
+      fetch(`https://rdap.org/domain/${encodeURIComponent(domain)}`, {
+        signal,
+        redirect: "follow",
+        headers: { accept: "application/rdap+json", "user-agent": UA },
+      }),
+    12000,
+  );
+  if (!res || !res.ok) return empty;
+
+  const data = (await res.json().catch(() => null)) as Record<string, any> | null;
+  if (!data) return empty;
+
+  const events: Record<string, string> = {};
+  for (const e of (data["events"] ?? []) as any[]) {
+    if (e?.eventAction && e?.eventDate) events[String(e.eventAction).toLowerCase()] = String(e.eventDate);
+  }
+  const createdAt = events["registration"];
+  const updatedAt = events["last changed"] ?? events["last update of rdap database"];
+  const expiresAt = events["expiration"];
+
+  const now = Date.now();
+  const ageDays = createdAt ? Math.floor((now - Date.parse(createdAt)) / 86400000) : undefined;
+  const daysToExpiry = expiresAt ? Math.floor((Date.parse(expiresAt) - now) / 86400000) : undefined;
+
+  let registrar: string | undefined;
+  let registrarIanaId: string | undefined;
+  let abuseEmail: string | undefined;
+  let abusePhone: string | undefined;
+  const contacts: WhoisContact[] = [];
+
+  const walk = (entities: any[]) => {
+    for (const ent of entities ?? []) {
+      const roles: string[] = ent?.roles ?? [];
+      const name = vcardValue(ent?.vcardArray, "fn");
+      const org = vcardValue(ent?.vcardArray, "org");
+      const email = vcardValue(ent?.vcardArray, "email");
+      const phone = vcardValue(ent?.vcardArray, "tel")?.replace(/^tel:/, "");
+      const country = vcardCountry(ent?.vcardArray);
+
+      if (roles.includes("registrar")) {
+        registrar = name ?? org ?? registrar;
+        const iana = (ent?.publicIds ?? []).find((p: any) => /iana/i.test(p?.type ?? ""));
+        if (iana?.identifier) registrarIanaId = String(iana.identifier);
+      }
+      if (roles.includes("abuse")) {
+        abuseEmail = email ?? abuseEmail;
+        abusePhone = phone ?? abusePhone;
+      }
+      for (const r of roles) {
+        if (["registrant", "administrative", "technical", "billing"].includes(r) && (name || org || email)) {
+          contacts.push({ role: r, name, org, email, phone, country });
+        }
+      }
+      if (Array.isArray(ent?.entities)) walk(ent.entities);
+    }
+  };
+  walk((data["entities"] ?? []) as any[]);
+
+  const nameservers = ((data["nameservers"] ?? []) as any[])
+    .map((n) => String(n?.ldhName ?? "").toLowerCase())
+    .filter(Boolean);
+
+  const statuses = ((data["status"] ?? []) as any[]).map((s) => String(s));
+  const dnssec = data["secureDNS"]?.delegationSigned;
+
+  const privacyProtected =
+    contacts.length === 0 ||
+    contacts.some((c) =>
+      /privacy|redacted|whois ?guard|data protected|withheld|not disclosed|contact privacy/i.test(
+        `${c.name ?? ""} ${c.org ?? ""} ${c.email ?? ""}`,
+      ),
+    );
+
+  const html = homeHtml.toLowerCase();
+  const parkSign = PARKING_SIGNS.find((s) => html.includes(s) || nameservers.some((n) => n.includes(s.split(".")[0]!)));
+  const expired = daysToExpiry !== undefined && daysToExpiry < 0;
+
+  return {
+    available: true,
+    domain: String(data["ldhName"] ?? domain).toLowerCase(),
+    registrar,
+    registrarIanaId,
+    abuseEmail,
+    abusePhone,
+    createdAt,
+    updatedAt,
+    expiresAt,
+    ageDays,
+    daysToExpiry,
+    expired,
+    statuses,
+    nameservers,
+    dnssec: typeof dnssec === "boolean" ? dnssec : undefined,
+    contacts,
+    privacyProtected,
+    parked: Boolean(parkSign),
+    parkedReason: parkSign ? `Parking indicator "${parkSign}" detected` : undefined,
+    source: "RDAP (ICANN registry data)",
+  };
+}
 
 const UA = "Mozilla/5.0 (compatible; SurfaceScan/1.0; +security-audit)";
 
@@ -493,6 +655,7 @@ export function buildRisks(input: {
   headers: HeaderCheck[];
   subdomains: SubdomainFinding[];
   pages: PageFinding[];
+  whois?: WhoisInfo | undefined;
 }): RiskItem[] {
   const risks: RiskItem[] = [];
 
@@ -583,6 +746,83 @@ export function buildRisks(input: {
         ? "Confirm this non-production or admin host requires authentication and IP allow-listing."
         : "Dangling CT entries can indicate stale infrastructure or subdomain-takeover risk — verify ownership.",
     });
+  }
+
+  const w = input.whois;
+  if (w?.available) {
+    if (w.expired) {
+      risks.push({
+        id: "whois-expired",
+        title: "Domain registration has expired",
+        severity: "critical",
+        category: "DNS",
+        evidence: `Registry expiry date ${w.expiresAt} has passed (${Math.abs(w.daysToExpiry ?? 0)} day(s) ago).`,
+        remediation: "Renew the domain immediately — expired domains can be dropped and re-registered by anyone.",
+      });
+    } else if (w.daysToExpiry !== undefined && w.daysToExpiry <= 30) {
+      risks.push({
+        id: "whois-expiring",
+        title: `Domain expires in ${w.daysToExpiry} day(s)`,
+        severity: w.daysToExpiry <= 7 ? "high" : "medium",
+        category: "DNS",
+        evidence: `Registry expiry date is ${w.expiresAt}.`,
+        remediation: "Renew now and enable auto-renew to avoid an accidental lapse and domain hijack.",
+      });
+    }
+    if (!w.statuses.some((s) => /transfer ?prohibited/i.test(s))) {
+      risks.push({
+        id: "whois-no-lock",
+        title: "Domain transfer lock is not set",
+        severity: "medium",
+        category: "DNS",
+        evidence: `Registry status: ${w.statuses.join(", ") || "none reported"}.`,
+        remediation: "Enable clientTransferProhibited (registrar lock) to block unauthorised domain transfers.",
+      });
+    }
+    if (w.dnssec === false) {
+      risks.push({
+        id: "whois-dnssec",
+        title: "DNSSEC is not enabled",
+        severity: "low",
+        category: "DNS",
+        evidence: `${w.domain} is not signed in the registry (delegationSigned = false).`,
+        remediation: "Enable DNSSEC at your registrar and DNS host to protect against DNS spoofing.",
+      });
+    }
+    if (w.parked) {
+      risks.push({
+        id: "whois-parked",
+        title: "Domain appears to be parked",
+        severity: "medium",
+        category: "Exposure",
+        evidence: w.parkedReason ?? "Parking page indicators found on the homepage.",
+        remediation: "Parked domains serve third-party ads and can damage brand trust. Point it at real content or redirect it.",
+      });
+    }
+    if (!w.privacyProtected && w.contacts.some((c) => c.email)) {
+      risks.push({
+        id: "whois-exposed-contacts",
+        title: "Registrant contact details are public",
+        severity: "low",
+        category: "Exposure",
+        evidence: `Public registration data exposes ${w.contacts
+          .filter((c) => c.email)
+          .map((c) => `${c.role}: ${c.email}`)
+          .slice(0, 3)
+          .join(", ")}.`,
+        remediation: "Enable registrar WHOIS privacy to reduce targeted phishing and spam against domain owners.",
+      });
+    }
+    if (w.ageDays !== undefined && w.ageDays < 90) {
+      risks.push({
+        id: "whois-new",
+        title: `Domain registered only ${w.ageDays} day(s) ago`,
+        severity: "info",
+        category: "DNS",
+        evidence: `Registration date ${w.createdAt}. Newly registered domains are commonly used in phishing campaigns.`,
+        remediation: "Nothing to fix if this is your own new domain — but expect lower reputation scores at email and web filters.",
+      });
+    }
   }
 
   const exposed = input.pages.filter(
@@ -689,7 +929,8 @@ export async function runScan(rawDomain: string): Promise<ScanResult> {
   const ips = [...ipSet].slice(0, 30);
 
   const linkUrls = extractLinks(origin.html, domain, 24);
-  const hidden = await discoverHiddenPaths(domain);
+  const [hidden, whois] = await Promise.all([discoverHiddenPaths(domain), lookupWhois(domain, origin.html)]);
+  if (!whois.available) notes.push("Registration (WHOIS/RDAP) data was unavailable for this TLD or rate limited.");
   const hiddenUrls = hidden.urls.filter((h) => !linkUrls.includes(h.url));
   const [hosts, pages, hiddenPages] = await Promise.all([
     scanHosts(ips),
@@ -700,7 +941,7 @@ export async function runScan(rawDomain: string): Promise<ScanResult> {
   ]);
 
   const allPages = [...(origin.home ? [origin.home] : []), ...pages, ...hiddenPages];
-  const risks = buildRisks({ domain, dns, hosts, headers: origin.checks, subdomains, pages: allPages });
+  const risks = buildRisks({ domain, dns, hosts, headers: origin.checks, subdomains, pages: allPages, whois });
   const { score, grade } = scoreRisks(risks);
 
   return {
@@ -719,5 +960,6 @@ export async function runScan(rawDomain: string): Promise<ScanResult> {
     risks,
     tech: origin.tech,
     notes,
+    whois,
   };
 }
