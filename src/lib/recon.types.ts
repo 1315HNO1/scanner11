@@ -45,6 +45,38 @@ export type PageFinding = {
   source?: "home" | "linked" | "robots" | "sitemap" | "hidden" | undefined;
 };
 
+export type WhoisContact = {
+  role: string;
+  name?: string | undefined;
+  org?: string | undefined;
+  email?: string | undefined;
+  phone?: string | undefined;
+  country?: string | undefined;
+};
+
+export type WhoisInfo = {
+  available: boolean;
+  domain: string;
+  registrar?: string | undefined;
+  registrarIanaId?: string | undefined;
+  abuseEmail?: string | undefined;
+  abusePhone?: string | undefined;
+  createdAt?: string | undefined;
+  updatedAt?: string | undefined;
+  expiresAt?: string | undefined;
+  ageDays?: number | undefined;
+  daysToExpiry?: number | undefined;
+  expired: boolean;
+  statuses: string[];
+  nameservers: string[];
+  dnssec?: boolean | undefined;
+  contacts: WhoisContact[];
+  privacyProtected: boolean;
+  parked: boolean;
+  parkedReason?: string | undefined;
+  source?: string | undefined;
+};
+
 export type ScanResult = {
   domain: string;
   scannedAt: string;
@@ -61,4 +93,5 @@ export type ScanResult = {
   risks: RiskItem[];
   tech: string[];
   notes: string[];
+  whois?: WhoisInfo | undefined;
 };
