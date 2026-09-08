@@ -929,7 +929,8 @@ export async function runScan(rawDomain: string): Promise<ScanResult> {
   const ips = [...ipSet].slice(0, 30);
 
   const linkUrls = extractLinks(origin.html, domain, 24);
-  const hidden = await discoverHiddenPaths(domain);
+  const [hidden, whois] = await Promise.all([discoverHiddenPaths(domain), lookupWhois(domain, origin.html)]);
+  if (!whois.available) notes.push("Registration (WHOIS/RDAP) data was unavailable for this TLD or rate limited.");
   const hiddenUrls = hidden.urls.filter((h) => !linkUrls.includes(h.url));
   const [hosts, pages, hiddenPages] = await Promise.all([
     scanHosts(ips),
@@ -940,7 +941,7 @@ export async function runScan(rawDomain: string): Promise<ScanResult> {
   ]);
 
   const allPages = [...(origin.home ? [origin.home] : []), ...pages, ...hiddenPages];
-  const risks = buildRisks({ domain, dns, hosts, headers: origin.checks, subdomains, pages: allPages });
+  const risks = buildRisks({ domain, dns, hosts, headers: origin.checks, subdomains, pages: allPages, whois });
   const { score, grade } = scoreRisks(risks);
 
   return {
@@ -959,5 +960,6 @@ export async function runScan(rawDomain: string): Promise<ScanResult> {
     risks,
     tech: origin.tech,
     notes,
+    whois,
   };
 }
