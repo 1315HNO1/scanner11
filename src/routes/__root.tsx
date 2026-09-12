@@ -7,10 +7,9 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
-import { reportLovableError } from "../lib/lovable-error-reporting";
 
 function NotFoundComponent() {
   return (
@@ -37,9 +36,7 @@ function NotFoundComponent() {
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
   const router = useRouter();
-  useEffect(() => {
-    reportLovableError(error, { boundary: "tanstack_root_error_component" });
-  }, [error]);
+
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -77,18 +74,16 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Sentinel Scan discovers subdomains, pages, open ports, and IP addresses for comprehensive network security and risk management." },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Sentinel Scan discovers subdomains, pages, open ports, and IP addresses for comprehensive network security and risk management." },
+      { title: "SurfaceScan — Attack Surface & Subdomain Scanner" },
+      { name: "description", content: "SurfaceScan maps subdomains, pages, IP addresses and open ports of a domain and scores the findings into a risk register." },
+      { name: "author", content: "1315HN01" },
+      { property: "og:site_name", content: "SurfaceScan" },
+      { property: "og:title", content: "SurfaceScan — Attack Surface & Subdomain Scanner" },
+      { property: "og:description", content: "SurfaceScan maps subdomains, pages, IP addresses and open ports of a domain and scores the findings into a risk register." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:site", content: "@Lovable" },
-      { name: "twitter:title", content: "Lovable App" },
-      { name: "twitter:description", content: "Sentinel Scan discovers subdomains, pages, open ports, and IP addresses for comprehensive network security and risk management." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/3d7661f53fc81cce6cba0d3104317267/id-preview-4707bb9f--9974e095-ed16-4831-84fc-7b8742a904f8.lovable.app-1786533971057.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/3d7661f53fc81cce6cba0d3104317267/id-preview-4707bb9f--9974e095-ed16-4831-84fc-7b8742a904f8.lovable.app-1786533971057.png" },
+      { name: "twitter:title", content: "SurfaceScan — Attack Surface & Subdomain Scanner" },
+      { name: "twitter:description", content: "SurfaceScan maps subdomains, pages, IP addresses and open ports of a domain and scores the findings into a risk register." },
     ],
     links: [
       {
