@@ -60,8 +60,8 @@ function Index() {
           Map your entire <span className="text-primary">attack surface</span>
         </h1>
         <p className="mx-auto mt-4 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-          Subdomains, live pages, IP addresses, open ports, known CVEs, DNS and email hygiene, and HTTP security
-          headers — collected from live public intelligence sources and scored into one risk register.
+          Enter a domain and SurfaceScan pulls its subdomains, live pages, IP addresses, open ports, known CVEs, DNS
+          and email records and HTTP security headers from public sources, then scores everything in one risk register.
         </p>
       </header>
 
