@@ -19,6 +19,8 @@ export const Route = createFileRoute("/")({
       { property: "og:description", content: DESC },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { property: "og:image", content: "https://scanner11.lovable.app/surfacescan-cover.jpg" },
+      { name: "twitter:image", content: "https://scanner11.lovable.app/surfacescan-cover.jpg" },
     ],
   }),
   component: Index,
@@ -77,7 +79,7 @@ function Index() {
           <input
             value={domain}
             onChange={(e) => setDomain(e.target.value)}
-            placeholder="example.com"
+            placeholder="yourcompany.com"
             spellCheck={false}
             aria-label="Domain to scan"
             className="w-full bg-transparent py-3 text-sm text-foreground outline-none placeholder:text-muted-foreground"
