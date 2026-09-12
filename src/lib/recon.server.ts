@@ -1015,6 +1015,16 @@ export async function runScan(rawDomain: string): Promise<ScanResult> {
   const domain = normalizeDomain(rawDomain);
   const notes: string[] = [];
 
+  if (!/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(domain) || isIpLiteral(domain)) {
+    throw new Error("Enter a valid public domain name, for example example.com.");
+  }
+  if (!(await isPublicHost(domain))) {
+    throw new Error(
+      "This domain does not resolve to a public internet address, so it cannot be scanned. Internal, loopback and private addresses are not allowed.",
+    );
+  }
+
+
   const [dns, ct, origin] = await Promise.all([
     fullDns(domain),
     enumerateSubdomains(domain),
