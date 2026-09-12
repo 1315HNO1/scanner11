@@ -527,7 +527,7 @@ export async function inspectOrigin(domain: string): Promise<{
   httpsOk: boolean;
 }> {
   const res = await withTimeout(
-    (signal) => fetch(`https://${domain}/`, { signal, headers: { "user-agent": UA }, redirect: "follow" }),
+    (signal) => safeFetch(`https://${domain}/`, { signal, headers: { "user-agent": UA } }),
     15000,
   );
   if (!res) {
@@ -602,7 +602,7 @@ export function extractLinks(html: string, domain: string, cap: number): string[
 export async function probePages(urls: string[], source: PageFinding["source"] = "linked"): Promise<PageFinding[]> {
   return pool(urls, 8, async (url) => {
     const res = await withTimeout(
-      (signal) => fetch(url, { signal, headers: { "user-agent": UA }, redirect: "follow" }),
+      (signal) => safeFetch(url, { signal, headers: { "user-agent": UA } }),
       10000,
     );
     if (!res) return { url, status: null, source };
@@ -673,7 +673,7 @@ export async function discoverHiddenPaths(domain: string): Promise<{ urls: { url
 
   // robots.txt — disallowed paths are pages the owner wants hidden
   const robots = await withTimeout(
-    (signal) => fetch(`https://${domain}/robots.txt`, { signal, headers: { "user-agent": UA } }),
+    (signal) => safeFetch(`https://${domain}/robots.txt`, { signal, headers: { "user-agent": UA } }),
     8000,
   );
   if (robots && robots.ok) {
@@ -688,7 +688,7 @@ export async function discoverHiddenPaths(domain: string): Promise<{ urls: { url
 
   // sitemap.xml — often lists pages not linked from the homepage
   const sitemap = await withTimeout(
-    (signal) => fetch(`https://${domain}/sitemap.xml`, { signal, headers: { "user-agent": UA } }),
+    (signal) => safeFetch(`https://${domain}/sitemap.xml`, { signal, headers: { "user-agent": UA } }),
     8000,
   );
   if (sitemap && sitemap.ok) {
