@@ -216,6 +216,109 @@ export async function resolveDns(name: string, type: string): Promise<DnsRecord[
   return json.Answer.map((a) => ({ type, value: a.data.replace(/^"|"$/g, ""), ttl: a.TTL }));
 }
 
+/* ---------------------------------------------------------------------------
+ * SSRF protection: every outbound request to a user-supplied host must first
+ * resolve to a public, routable IP address. Private, loopback, link-local and
+ * cloud metadata ranges are refused, and every redirect hop is re-validated.
+ * ------------------------------------------------------------------------- */
+
+function ipv4IsPublic(ip: string): boolean {
+  const parts = ip.split(".");
+  if (parts.length !== 4) return false;
+  const n = parts.map((p) => Number(p));
+  if (n.some((x) => !Number.isInteger(x) || x < 0 || x > 255)) return false;
+  const [a, b] = n as [number, number, number, number];
+  if (a === 0 || a === 10 || a === 127) return false; // this-network, private, loopback
+  if (a === 169 && b === 254) return false; // link-local + cloud metadata (169.254.169.254)
+  if (a === 172 && b >= 16 && b <= 31) return false; // private
+  if (a === 192 && b === 168) return false; // private
+  if (a === 192 && b === 0) return false; // IETF protocol assignments / 192.0.0.0/24 + TEST-NET-1
+  if (a === 198 && (b === 18 || b === 19)) return false; // benchmarking
+  if (a === 100 && b >= 64 && b <= 127) return false; // carrier-grade NAT
+  if (a >= 224) return false; // multicast, reserved, broadcast
+  return true;
+}
+
+function ipv6IsPublic(raw: string): boolean {
+  const ip = raw.toLowerCase().replace(/^\[|\]$/g, "").split("%")[0]!;
+  if (!ip.includes(":")) return false;
+  if (ip === "::" || ip === "::1") return false; // unspecified, loopback
+  // IPv4-mapped / IPv4-compatible: judge the embedded IPv4 address
+  const mapped = ip.match(/(?:^::ffff:|^::)(\d+\.\d+\.\d+\.\d+)$/);
+  if (mapped) return ipv4IsPublic(mapped[1]!);
+  const head = ip.split(":")[0] ?? "";
+  if (/^f[cd]/.test(head)) return false; // fc00::/7 unique local
+  if (/^fe[89ab]/.test(head)) return false; // fe80::/10 link-local
+  if (/^ff/.test(head)) return false; // multicast
+  return true;
+}
+
+export function isPublicIp(ip: string): boolean {
+  return ip.includes(":") ? ipv6IsPublic(ip) : ipv4IsPublic(ip);
+}
+
+function isIpLiteral(host: string): boolean {
+  return /^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.includes(":") || /^\[.*\]$/.test(host);
+}
+
+const hostSafetyCache = new Map<string, Promise<boolean>>();
+
+/** Resolves a hostname and reports whether every resolved address is publicly routable. */
+export function isPublicHost(hostname: string): Promise<boolean> {
+  const host = hostname.toLowerCase().replace(/\.$/, "");
+  const cached = hostSafetyCache.get(host);
+  if (cached) return cached;
+
+  const task = (async () => {
+    if (!host || host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local")) return false;
+    if (isIpLiteral(host)) return isPublicIp(host.replace(/^\[|\]$/g, ""));
+
+    const [a, aaaa] = await Promise.all([resolveDns(host, "A"), resolveDns(host, "AAAA")]);
+    const addresses = [...a, ...aaaa]
+      .map((r) => r.value.trim())
+      .filter((v) => /^\d{1,3}(\.\d{1,3}){3}$/.test(v) || v.includes(":"));
+    if (addresses.length === 0) return false; // unresolvable -> nothing safe to fetch
+    return addresses.every((ip) => isPublicIp(ip));
+  })();
+
+  hostSafetyCache.set(host, task);
+  return task;
+}
+
+/**
+ * fetch() that refuses internal targets. Redirects are followed manually so
+ * each hop is re-validated instead of trusting the runtime's redirect handling.
+ */
+export async function safeFetch(
+  url: string,
+  init: RequestInit & { signal?: AbortSignal },
+  maxHops = 4,
+): Promise<Response | null> {
+  let current = url;
+  for (let hop = 0; hop <= maxHops; hop++) {
+    let parsed: URL;
+    try {
+      parsed = new URL(current);
+    } catch {
+      return null;
+    }
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return null;
+    if (!(await isPublicHost(parsed.hostname))) return null;
+
+    const res = await fetch(parsed.href, { ...init, redirect: "manual" });
+    if (res.status < 300 || res.status > 399) return res;
+
+    const location = res.headers.get("location");
+    if (!location) return res;
+    try {
+      current = new URL(location, parsed.href).href;
+    } catch {
+      return res;
+    }
+  }
+  return null;
+}
+
 export async function fullDns(domain: string): Promise<DnsRecord[]> {
   const groups = await pool([...DNS_TYPES], 8, (t) => resolveDns(domain, t));
   const seen = new Set<string>();
@@ -424,7 +527,7 @@ export async function inspectOrigin(domain: string): Promise<{
   httpsOk: boolean;
 }> {
   const res = await withTimeout(
-    (signal) => fetch(`https://${domain}/`, { signal, headers: { "user-agent": UA }, redirect: "follow" }),
+    (signal) => safeFetch(`https://${domain}/`, { signal, headers: { "user-agent": UA } }),
     15000,
   );
   if (!res) {
@@ -499,7 +602,7 @@ export function extractLinks(html: string, domain: string, cap: number): string[
 export async function probePages(urls: string[], source: PageFinding["source"] = "linked"): Promise<PageFinding[]> {
   return pool(urls, 8, async (url) => {
     const res = await withTimeout(
-      (signal) => fetch(url, { signal, headers: { "user-agent": UA }, redirect: "follow" }),
+      (signal) => safeFetch(url, { signal, headers: { "user-agent": UA } }),
       10000,
     );
     if (!res) return { url, status: null, source };
@@ -570,7 +673,7 @@ export async function discoverHiddenPaths(domain: string): Promise<{ urls: { url
 
   // robots.txt — disallowed paths are pages the owner wants hidden
   const robots = await withTimeout(
-    (signal) => fetch(`https://${domain}/robots.txt`, { signal, headers: { "user-agent": UA } }),
+    (signal) => safeFetch(`https://${domain}/robots.txt`, { signal, headers: { "user-agent": UA } }),
     8000,
   );
   if (robots && robots.ok) {
@@ -585,7 +688,7 @@ export async function discoverHiddenPaths(domain: string): Promise<{ urls: { url
 
   // sitemap.xml — often lists pages not linked from the homepage
   const sitemap = await withTimeout(
-    (signal) => fetch(`https://${domain}/sitemap.xml`, { signal, headers: { "user-agent": UA } }),
+    (signal) => safeFetch(`https://${domain}/sitemap.xml`, { signal, headers: { "user-agent": UA } }),
     8000,
   );
   if (sitemap && sitemap.ok) {
@@ -912,6 +1015,16 @@ export async function runScan(rawDomain: string): Promise<ScanResult> {
   const domain = normalizeDomain(rawDomain);
   const notes: string[] = [];
 
+  if (!/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(domain) || isIpLiteral(domain)) {
+    throw new Error("Enter a valid public domain name, for example example.com.");
+  }
+  if (!(await isPublicHost(domain))) {
+    throw new Error(
+      "This domain does not resolve to a public internet address, so it cannot be scanned. Internal, loopback and private addresses are not allowed.",
+    );
+  }
+
+
   const [dns, ct, origin] = await Promise.all([
     fullDns(domain),
     enumerateSubdomains(domain),
@@ -926,7 +1039,7 @@ export async function runScan(rawDomain: string): Promise<ScanResult> {
   const ipSet = new Set<string>();
   for (const r of dns) if (r.type === "A") ipSet.add(r.value);
   for (const s of subdomains) for (const ip of s.ips) ipSet.add(ip);
-  const ips = [...ipSet].slice(0, 30);
+  const ips = [...ipSet].filter((ip) => isPublicIp(ip)).slice(0, 30);
 
   const linkUrls = extractLinks(origin.html, domain, 24);
   const [hidden, whois] = await Promise.all([discoverHiddenPaths(domain), lookupWhois(domain, origin.html)]);
