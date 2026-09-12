@@ -1039,7 +1039,7 @@ export async function runScan(rawDomain: string): Promise<ScanResult> {
   const ipSet = new Set<string>();
   for (const r of dns) if (r.type === "A") ipSet.add(r.value);
   for (const s of subdomains) for (const ip of s.ips) ipSet.add(ip);
-  const ips = [...ipSet].slice(0, 30);
+  const ips = [...ipSet].filter((ip) => isPublicIp(ip)).slice(0, 30);
 
   const linkUrls = extractLinks(origin.html, domain, 24);
   const [hidden, whois] = await Promise.all([discoverHiddenPaths(domain), lookupWhois(domain, origin.html)]);
