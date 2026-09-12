@@ -79,7 +79,7 @@ function Index() {
           <input
             value={domain}
             onChange={(e) => setDomain(e.target.value)}
-            placeholder="example.com"
+            placeholder="yourcompany.com"
             spellCheck={false}
             aria-label="Domain to scan"
             className="w-full bg-transparent py-3 text-sm text-foreground outline-none placeholder:text-muted-foreground"
