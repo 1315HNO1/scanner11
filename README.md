@@ -1,26 +1,29 @@
-# Sentinel Scan
+# SurfaceScan
 
-create website that scan subdomains all and all pages also risk management and network security also open ports ip addresses everything required make it accurate
+Passive attack-surface scanner. Enter a domain and SurfaceScan collects:
 
-This project was built with [Lovable](https://lovable.dev).
+- subdomains from public certificate transparency logs and a DNS sweep
+- reachable pages, including paths found in `robots.txt`, `sitemap.xml` and a sensitive-path probe
+- IP addresses, open ports and known CVEs from public fingerprint indexes
+- DNS records, WHOIS/RDAP registration data and HTTP security headers
+- a scored risk register with severities and remediation notes
 
-**Live app**: https://scanner11.lovable.app
-
-## Build with Lovable
-
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/9974e095-ed16-4831-84fc-7b8742a904f8).
-
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
+All data comes from public sources. No intrusive probing is performed. Only scan
+domains you own or are authorised to test.
 
 ## Development
 
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
+Requires Node.js and npm.
 
 ```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
+npm install
 npm run dev
 ```
+
+Build for production:
+
+```sh
+npm run build
+```
+
+Made by 1315HN01.
